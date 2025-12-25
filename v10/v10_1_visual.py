@@ -253,7 +253,7 @@ def plot_experiment_results(
 # -------------------------
 if __name__ == "__main__":
     # 假设你的df已经加载完成（替换成实际的df）
-    # df = results["df"]  # 你的原始df
+    df = results["df"]  # 你的原始df
     
     # 调用函数生成所有图表
     stats = plot_experiment_results(

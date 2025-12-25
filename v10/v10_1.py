@@ -15,6 +15,48 @@
 #   - V[k]: bottom-up weight predicting x_{k+1} from x_k (shape dim_{k+1} x dim_k)
 #   - ε_gen[k]  corresponds to layer k (k=0..L-1)
 #   - ε_disc[k] corresponds to layer k (k=1..L)
+# 在文件开头补充这两个 import（如果还没有）
+
+import os
+import radas  # pyright: ignore[reportMissingImports]
+
+# --------------------------
+# Data: MNIST scaled to [-1, 1]
+# --------------------------
+def load_mnist_data(
+    batch_size=256,
+    data_root=None,
+    download=False,          # 关键：默认不下载
+    num_workers=0,
+    pin_memory=False,
+    user_name="mengfan",     # 关键：用 radas 定位数据目录
+):
+    """
+    从你已下载好的 MNIST 目录读取数据（不再下载）。
+    你的存放路径应为：radas.get_data_dir(user_name)/data
+    """
+    if data_root is None:
+        base_dir = radas.get_data_dir(user_name=user_name)
+        data_root = os.path.join(base_dir, "data")
+
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,)),  # [0,1] -> [-1,1]
+    ])
+
+    # download=False：如果目录下不存在 raw/processed，会直接报错提醒
+    train_dataset = datasets.MNIST(root=data_root, train=True, download=download, transform=transform)
+    test_dataset  = datasets.MNIST(root=data_root, train=False, download=download, transform=transform)
+
+    train_loader = DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True,
+        num_workers=num_workers, pin_memory=pin_memory
+    )
+    test_loader = DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False,
+        num_workers=num_workers, pin_memory=pin_memory
+    )
+    return train_loader, test_loader
 
 import math
 import torch
@@ -70,23 +112,6 @@ def get_activation(name: str, negative_slope: float = 0.01):
         return _gelu, _gelu_prime
     raise ValueError(f"Unknown activation: {name}")
 
-
-# --------------------------
-# Data: MNIST scaled to [-1, 1]
-# --------------------------
-def load_mnist_data(batch_size=256, data_root="./data", download=True, num_workers=0, pin_memory=False):
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5,), (0.5,)),  # [0,1] -> [-1,1]
-    ])
-    train_dataset = datasets.MNIST(root=data_root, train=True, download=download, transform=transform)
-    test_dataset  = datasets.MNIST(root=data_root, train=False, download=download, transform=transform)
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
-                              num_workers=num_workers, pin_memory=pin_memory)
-    test_loader  = DataLoader(test_dataset,  batch_size=batch_size, shuffle=False,
-                              num_workers=num_workers, pin_memory=pin_memory)
-    return train_loader, test_loader
 
 
 # --------------------------
@@ -409,12 +434,29 @@ def trainable(config: dict):
     results["torch.cuda.is_available"] = bool(torch.cuda.is_available())
 
     # data
+    # data
     batch_size = int(config.get("batch_size", 256))
-    data_root = config.get("data_root", "./data")
-    download = bool(config.get("download", True))
+
+    # 你也可以继续允许外部传 data_root；不传就用 radas 默认目录
+    data_root = config.get("data_root", None)
+
+    download = bool(config.get("download", False))  # 关键：默认 False
     num_workers = int(config.get("num_workers", 0))
     pin_memory = bool(config.get("pin_memory", False))
-    train_loader, test_loader = load_mnist_data(batch_size, data_root, download, num_workers, pin_memory)
+    user_name = config.get("user_name", "mengfan")
+
+    train_loader, test_loader = load_mnist_data(
+        batch_size=batch_size,
+        data_root=data_root,
+        download=download,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        user_name=user_name,
+    )
+
+    # 可选：打印一下最终使用的数据目录，方便你确认
+    print(f"[MNIST] data_root={data_root if data_root is not None else os.path.join(radas.get_data_dir(user_name=user_name), 'data')}, download={download}")
+
 
     # model + hyperparams (paper-like defaults)
     layers = config.get("layers", [784, 256, 256, 10])
