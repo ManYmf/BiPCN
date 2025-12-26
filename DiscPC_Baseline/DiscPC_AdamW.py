@@ -21,9 +21,11 @@ import os
 import math
 import torch
 import numpy as np
-import radas  # pyright: ignore[reportMissingImports]
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
+import radas  # pyright: ignore[reportMissingImports]
+
+#保证cuDNN的deterministic
 
 
 # --------------------------
@@ -87,19 +89,19 @@ def get_activation(name: str, negative_slope: float = 0.01):
 
 # --------------------------
 # Data loader: MNIST scaled to [-1, 1]
-# (CHANGED) Use radas.get_data_dir(user_name)/data by default; default download=False
 # --------------------------
 def load_mnist_data(
     batch_size=256,
-    data_root=None,
+    data_root=None,          # None -> 自动用 radas 路径
     download=False,          # 关键：默认不下载
     num_workers=0,
     pin_memory=False,
-    user_name="mengfan",     # 关键：用 radas 定位数据目录
+    user_name="mengfan",     # 用于定位 radas 数据目录
 ):
     """
-    从你已下载好的 MNIST 目录读取数据（默认不再下载）。
-    默认存放路径：radas.get_data_dir(user_name)/data
+    从已下载的 MNIST 目录读取数据：
+      radas.get_data_dir(user_name)/data
+    若你显式传入 data_root，则优先使用 data_root。
     """
     if data_root is None:
         base_dir = radas.get_data_dir(user_name=user_name)
@@ -112,9 +114,8 @@ def load_mnist_data(
         ]
     )
 
-    # download=False：如果目录下不存在 raw/processed，会直接报错提醒
     train_dataset = datasets.MNIST(root=data_root, train=True, download=download, transform=transform)
-    test_dataset = datasets.MNIST(root=data_root, train=False, download=download, transform=transform)
+    test_dataset  = datasets.MNIST(root=data_root, train=False, download=download, transform=transform)
 
     train_loader = DataLoader(
         train_dataset,
@@ -131,6 +132,7 @@ def load_mnist_data(
         pin_memory=pin_memory,
     )
     return train_loader, test_loader
+
 
 
 # --------------------------
@@ -361,7 +363,8 @@ class DiscPCMLP:
 # --------------------------
 def trainable(config: dict):
     results = {}
-
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
     # reproducibility
     seed = int(config.get("seed", 0))
     torch.manual_seed(seed)
@@ -375,13 +378,14 @@ def trainable(config: dict):
     results["device"] = str(device)
     results["torch.cuda.is_available"] = bool(torch.cuda.is_available())
 
-    # data (CHANGED)
+    # data
     batch_size = int(config.get("batch_size", 256))
-    data_root = config.get("data_root", None)          # 默认 None -> radas.get_data_dir(user_name)/data
-    download = bool(config.get("download", False))     # 默认 False
+    user_name = str(config.get("user_name", "mengfan"))
+    data_root = config.get("data_root", None)          # None -> radas 自动路径
+    download = bool(config.get("download", False))     # 默认不下载
+
     num_workers = int(config.get("num_workers", 0))
     pin_memory = bool(config.get("pin_memory", False))
-    user_name = config.get("user_name", "mengfan")     # 新增：用于 radas 定位目录
 
     train_loader, test_loader = load_mnist_data(
         batch_size=batch_size,
@@ -391,6 +395,8 @@ def trainable(config: dict):
         pin_memory=pin_memory,
         user_name=user_name,
     )
+    print(f"[MNIST] root={data_root if data_root is not None else os.path.join(radas.get_data_dir(user_name=user_name), 'data')} download={download}")
+
 
     # model hyperparams (paper-like defaults)
     layers = config.get("layers", [784, 256, 256, 10])
@@ -563,9 +569,8 @@ if __name__ == "__main__":
     cfg = dict(
         seed=0,
         device=None,
-        data_root=None,     # (CHANGED) 默认走 radas.get_data_dir(user_name)/data
-        download=False,     # (CHANGED) 默认不下载
-        user_name="mengfan",
+        data_root="./data",
+        download=True,
         batch_size=256,
         epochs=25,
         layers=[784, 256, 256, 10],
