@@ -17,7 +17,7 @@ echo "=== 执行 git commit -m '$COMMIT_MSG' ==="
 git commit -m "$COMMIT_MSG" || { echo "❌ git commit 失败"; exit 1; }
 
 # 执行 git push
-echo "=== 执行 git push origin main ==="
-git push origin main || { echo "❌ git push 失败"; exit 1; }
+echo "=== 执行 git push origin Atol-Server ==="
+git push origin Atol-Server || { echo "❌ git push 失败"; exit 1; }
 
 echo "✅ 推送成功！提交信息：$COMMIT_MSG"
