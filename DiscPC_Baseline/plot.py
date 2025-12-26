@@ -9,7 +9,7 @@ os.chdir(current_dir)
 df = pd.read_pickle("discpc_baseline_AdamW.pkl")
 
 # 步骤1：定义筛选条件
-condition = (df["config/use_bias"] == True) 
+condition = (df["config/use_bias"] == True) & (df["config/lr_x"] == 1e-2)
 
 # 步骤2：筛选行 + 选取目标列（final/test_acc）
 filtered_acc = df[condition]["final/test_acc"]
