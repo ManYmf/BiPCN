@@ -16,8 +16,9 @@ git add . || { echo "❌ git add 失败"; exit 1; }
 echo "=== 执行 git commit -m '$COMMIT_MSG' ==="
 git commit -m "$COMMIT_MSG" || { echo "❌ git commit 失败"; exit 1; }
 
-# 执行 git push
-echo "=== 执行 git push origin main ==="
-git push origin main || { echo "❌ git push 失败"; exit 1; }
-
+# 获取当前分支名
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+# 推送当前分支到远程
+echo "=== 执行 git push origin $CURRENT_BRANCH ==="
+git push origin "$CURRENT_BRANCH" || { echo "❌ git push 失败"; exit 1; }
 echo "✅ 推送成功！提交信息：$COMMIT_MSG"
